@@ -43,13 +43,25 @@ pipeline {
         stage('Deploy Dev and Staging') {
             steps {
                 script {
-                    // Stop/remove old containers if exist
-                    sh "docker rm -f dev || true"
-                    sh "docker rm -f staging || true"
+                    // Stop old containers
+                    sh "docker rm -f dev staging 2>/dev/null || true"
 
-                    // Run new containers
-                    sh "docker run -d -p 8001:8000 --name dev ${env.IMAGE_TAG}"
-                    sh "docker run -d -p 8002:8000 --name staging ${env.IMAGE_TAG}"
+                    // Run new containers with health check
+                    sh """
+                        docker run -d \\
+                          -p 8001:8000 \\
+                          --name dev \\
+                          --health-cmd="curl -f http://localhost:8000/ || exit 1" \\
+                          --health-interval=30s \\
+                          ${env.IMAGE_TAG}
+
+                        docker run -d \\
+                          -p 8002:8000 \\
+                          --name staging \\
+                          --health-cmd="curl -f http://localhost:8000/ || exit 1" \\
+                          --health-interval=30s \\
+                          ${env.IMAGE_TAG}
+                    """
                 }
             }
         }
@@ -64,4 +76,3 @@ pipeline {
         }
     }
 }
-
