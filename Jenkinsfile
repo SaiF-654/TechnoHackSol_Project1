@@ -1,11 +1,5 @@
 pipeline {
-    agent {
-    docker {
-        image 'python:3.14.2-alpine3.23'
-        reuseNode true
-        args '--user root'  // ← THIS SOLVES THE PERMISSION ERROR
-    }
-}
+    agent any
     
     stages {
         stage('Checkout') {
@@ -14,19 +8,15 @@ pipeline {
             }
         }
         
-        stage('Install & Test') {
-            agent {
-                docker {
-                    image 'python:3.14.2-alpine3.23'
-                    reuseNode true
-                    args '--user root'  // ← CRITICAL FIX: Run as root
-                }
-            }
+        stage('Install Dependencies') {
             steps {
-                // Install dependencies as root (no permission issues)
-                sh 'pip install --no-cache-dir -r requirements.txt'
-                
-                // Run tests
+                sh 'python --version'
+                sh 'pip install --user -r requirements.txt'
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
                 sh 'python -m pytest . --junitxml=test-results.xml'
             }
             post {
@@ -38,9 +28,7 @@ pipeline {
         
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.build("my-python-app:${env.BUILD_ID}")
-                }
+                sh 'docker build -t my-python-app:latest .'
             }
         }
     }
@@ -48,6 +36,7 @@ pipeline {
     post {
         success {
             echo '✅ Pipeline SUCCESS! All tests passed and Docker image built.'
+            sh 'echo "Build Number: ${BUILD_NUMBER}"'
         }
         failure {
             echo '❌ Pipeline FAILED! Check the logs above.'
