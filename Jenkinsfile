@@ -1,45 +1,67 @@
 pipeline {
     agent any
-    
+
+    environment {
+        IMAGE_NAME = 'saifrehman123/django-jenkins'
+        DOCKER_CREDENTIALS_ID = 'dockerhub-cred'
+    }
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        
-        stage('Install Dependencies') {
+
+        stage('Build Docker Image') {
             steps {
-                sh 'python --version'
-                sh 'pip install --user -r requirements.txt'
-            }
-        }
-        
-        stage('Run Tests') {
-            steps {
-                sh 'python -m pytest . --junitxml=test-results.xml'
-            }
-            post {
-                always {
-                    junit 'test-results.xml'
+                script {
+                    env.IMAGE_TAG = "${IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    sh "docker build -t ${env.IMAGE_TAG} ."
                 }
             }
         }
-        
-        stage('Build Docker Image') {
+
+        stage('Login to Docker Hub') {
             steps {
-                sh 'docker build -t my-python-app:latest .'
+                withCredentials([usernamePassword(
+                    credentialsId: "${DOCKER_CREDENTIALS_ID}",
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                }
+            }
+        }
+
+        stage('Push Image to Docker Hub') {
+            steps {
+                sh "docker push ${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('Deploy Dev and Staging') {
+            steps {
+                script {
+                    // Stop/remove old containers if exist
+                    sh "docker rm -f dev || true"
+                    sh "docker rm -f staging || true"
+
+                    // Run new containers
+                    sh "docker run -d -p 8001:8000 --name dev ${env.IMAGE_TAG}"
+                    sh "docker run -d -p 8002:8000 --name staging ${env.IMAGE_TAG}"
+                }
             }
         }
     }
-    
+
     post {
         success {
-            echo '✅ Pipeline SUCCESS! All tests passed and Docker image built.'
-            sh 'echo "Build Number: ${BUILD_NUMBER}"'
+            echo "✅ Dev running on port 8001 | Staging running on port 8002"
         }
         failure {
-            echo '❌ Pipeline FAILED! Check the logs above.'
+            echo '❌ Deployment failed'
         }
     }
 }
+
