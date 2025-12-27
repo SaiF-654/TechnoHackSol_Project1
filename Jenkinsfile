@@ -6,7 +6,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm // Checks out the code from your repository
+                checkout scm
             }
         }
         stage('Build Docker Image') {
@@ -18,10 +18,14 @@ pipeline {
         }
         stage('Test') {
             agent {
-                docker { image 'python:3.14.2-alpine3.23' }
+                docker {
+                    image 'python:3.14.2-alpine3.23'
+                    reuseNode true
+                }
             }
             steps {
-                sh 'python -m pytest --junitxml=test-results.xml || true'
+                sh 'pip install -r requirements.txt'  # Ensure pytest is installed
+                sh 'python -m pytest --junitxml=test-results.xml'  # Remove "|| true"
             }
             post {
                 always {
