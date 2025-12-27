@@ -10,15 +10,7 @@ pipeline {
             }
         }
         
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
-                }
-            }
-        }
-        
-        stage('Test') {
+        stage('Build & Test') {
             agent {
                 docker {
                     image 'python:3.14.2-alpine3.23'
@@ -26,8 +18,10 @@ pipeline {
                 }
             }
             steps {
-                // Run pytest - dependencies are already installed in the Docker image
-                // Use '.' to run all tests in current directory
+                // Install dependencies
+                sh 'pip install --no-cache-dir -r requirements.txt'
+                
+                // Run tests
                 sh 'python -m pytest . --junitxml=test-results.xml'
             }
             post {
@@ -37,11 +31,10 @@ pipeline {
             }
         }
         
-        stage('Cleanup') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    // Clean up Docker images to save space
-                    sh 'docker image prune -f || true'
+                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
                 }
             }
         }
