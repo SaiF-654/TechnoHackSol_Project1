@@ -9,6 +9,7 @@ pipeline {
                 checkout scm
             }
         }
+        
         stage('Build Docker Image') {
             steps {
                 script {
@@ -16,6 +17,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Test') {
             agent {
                 docker {
@@ -24,14 +26,36 @@ pipeline {
                 }
             }
             steps {
-                sh 'pip install -r requirements.txt'
-                sh 'python -m pytest test_simple.py --junitxml=test-results.xml'
+                // Run pytest - dependencies are already installed in the Docker image
+                // Use '.' to run all tests in current directory
+                sh 'python -m pytest . --junitxml=test-results.xml'
             }
             post {
                 always {
                     junit 'test-results.xml'
                 }
             }
+        }
+        
+        stage('Cleanup') {
+            steps {
+                script {
+                    // Clean up Docker images to save space
+                    sh 'docker image prune -f || true'
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed - check test results above'
+        }
+        success {
+            echo '✅ Pipeline SUCCESS! All tests passed.'
+        }
+        failure {
+            echo '❌ Pipeline FAILED! Check the logs above.'
         }
     }
 }
