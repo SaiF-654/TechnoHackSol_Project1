@@ -24,8 +24,8 @@ pipeline {
                 }
             }
             steps {
-                sh 'pip install -r requirements.txt'  # Ensure pytest is installed
-                sh 'python -m pytest --junitxml=test-results.xml'  # Remove "|| true"
+                sh 'pip install -r requirements.txt'
+                sh 'python -m pytest test_simple.py --junitxml=test-results.xml'
             }
             post {
                 always {
